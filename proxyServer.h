@@ -11,4 +11,4 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
-#define BUFFSIZE 5000
+#define BUFFSIZE 4096

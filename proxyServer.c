@@ -6,6 +6,24 @@ void error(const char *msg){
 	exit(-1);
 }
 
+int blacklist_check(char* URL){
+	FILE *ofp;
+	char* buffer=malloc(BUFFSIZE);
+	size_t length=0;
+	ofp=fopen("blacklist.txt","r");
+	while(getline(&buffer,&length,ofp)!=-1){
+		if(buffer[strlen(buffer)-1]=='\n')
+			buffer[strlen(buffer)-1]='\0';
+		printf("%s",buffer);
+		if(strcasecmp(buffer,URL)==0){
+			printf("Blacklisted site! Sending blacklist warning.");
+			return -1;
+		}
+	}
+	fclose(ofp);
+	return 0;
+}
+
 void* handle_client(void* socket_desc){
 	char *buffer = malloc(BUFFSIZE);// Buffer where everything will be saved
 	char* request=malloc(BUFFSIZE);
@@ -23,6 +41,7 @@ void* handle_client(void* socket_desc){
 		close(socket_client);
 	    error("ERROR recieving request.");
 	}
+	printf("Recieved request!\n");
  	buffer[byteRead] = '\0';//adds in NULL terminator as recv does not do this.
  	URL=malloc(strlen(buffer)+1);
  	strcpy(URL,buffer);
@@ -33,7 +52,14 @@ void* handle_client(void* socket_desc){
 	URL = strtok(NULL," ");	// Make another token to isolate the web address
 	if (URL[0] == '/')
 		memmove(URL, URL + 1, strlen(URL));
-	if(!access(URL,F_OK)){
+	if(blacklist_check(URL)==-1){
+		strcat(response,"HTTP/1.1 200 OK\r\n");
+		strcat(response,"Content-Type: text/html\r\n");
+		strcat(response,"Connection: close\r\n");
+		strcat(response,"\r\n<p>Cannot access Website. Blacklisted!</p>\r\n\r\n");
+		send(socket_client,response,strlen(response),0);
+	}
+	else if(!access(URL,F_OK)){
 		printf("FILE EXISTS\n");
 		// The file exists
 		ofp = fopen(URL, "r");	// Opens the file
