@@ -14,9 +14,8 @@ int blacklist_check(char* URL){
 	while(getline(&buffer,&length,ofp)!=-1){
 		if(buffer[strlen(buffer)-1]=='\n')
 			buffer[strlen(buffer)-1]='\0';
-		printf("%s",buffer);
 		if(strcasecmp(buffer,URL)==0){
-			printf("Blacklisted site! Sending blacklist warning.");
+			printf("Blacklisted site! Sending blacklist response.\n");
 			return -1;
 		}
 	}
@@ -28,10 +27,13 @@ void* handle_client(void* socket_desc){
 	char *buffer = malloc(BUFFSIZE);// Buffer where everything will be saved
 	char* request=malloc(BUFFSIZE);
 	char* response=malloc(BUFFSIZE);
+	char* path;
+	char* host;
 	char *URL;
 	int socket_client=*(int*)socket_desc;
 	int byteRead; 
 	int socket_server;
+	int i;
 	struct sockaddr_in server_address;		// Servers connection
 	struct hostent *server_URL;
 	int size_of_response;
@@ -52,6 +54,18 @@ void* handle_client(void* socket_desc){
 	URL = strtok(NULL," ");	// Make another token to isolate the web address
 	if (URL[0] == '/')
 		memmove(URL, URL + 1, strlen(URL));
+	path=malloc(strlen(URL));
+	host=malloc(strlen(URL));
+	for(i=0;i<strlen(URL);i++){
+		if(URL[i]=='/'){
+			strncpy(host,URL,i);
+			strncpy(path,URL+i+1,strlen(URL)-i);
+			break;
+		}
+	}
+	printf("\n%s %s\n",host,path);
+	response[0]='\0';
+	buffer[0]='\0';
 	if(blacklist_check(URL)==-1){
 		strcat(response,"HTTP/1.1 200 OK\r\n");
 		strcat(response,"Content-Type: text/html\r\n");
@@ -62,6 +76,10 @@ void* handle_client(void* socket_desc){
 	else if(!access(URL,F_OK)){
 		printf("FILE EXISTS\n");
 		// The file exists
+		for(i=0;i<strlen(URL)+1;i++){
+    		if(URL[i]=='/')
+    			URL[i]='_';
+    	}
 		ofp = fopen(URL, "r");	// Opens the file
 		// Checks for file error
 		if(ofp == NULL){
@@ -78,9 +96,9 @@ void* handle_client(void* socket_desc){
 		memset(&server_address, 0, sizeof(server_address));		// Clears up server_address so that there is nothing
 		server_address.sin_port= htons(80);
 		server_address.sin_family = AF_INET;
-		if((server_URL = gethostbyname(URL)) == NULL){
+		if((server_URL = gethostbyname(host)) == NULL){
 			close(socket_client);
-			error("Couldn't get an address\n");
+			error("Couldn't get an address");
 		}
 		printf("Server address found!\n");
 		if((socket_server = socket(AF_INET, SOCK_STREAM, 0)) <0){
@@ -101,9 +119,11 @@ void* handle_client(void* socket_desc){
 		}
 		printf("Connection made to server.\n");
 		request[0]='\0';
-		strcat(request,"GET / HTTP/1.1\r\n");
+		strcat(request,"GET /");
+		strcat(request,path);
+		strcat(request," HTTP/1.1\r\n");
 		strcat(request,"Host: ");
-		strcat(request,URL);
+		strcat(request,host);
 		strcat(request,"\r\n");
 		strcat(request,"Connection: close\r\n");
 		strcat(request,"If-Modified-Since: 0\r\n\r\n\0");
@@ -112,8 +132,6 @@ void* handle_client(void* socket_desc){
 			close(socket_server);
    		 	error("ERROR on server request");
    		}
-	   	response[0]='\0';
-	   	buffer[0]='\0';
 	   	do{	
 		   	if((size_of_response=read(socket_server,buffer,BUFFSIZE))<0){
 		   		close(socket_client);
@@ -127,6 +145,10 @@ void* handle_client(void* socket_desc){
     	printf("Server response recieved!\n");
     	pthread_mutex_lock(&mutex_lock);
     	FILE* ofp;
+    	for(i=0;i<strlen(URL)+1;i++){
+    		if(URL[i]=='/')
+    			URL[i]='_';
+    	}
     	ofp = fopen(URL, "w");	// Opens the file
 		// Checks for file error
 		if(ofp == NULL) {
@@ -192,103 +214,10 @@ int main(){
 			close(socket_listen);
 			error("ERROR accepting client.");
 		}
-//		socket_temp=malloc(sizeof(int));
-//		*socket_temp=socket_client;
 		if(pthread_create(&thread,NULL,handle_client,(void *)&socket_client)!=0){
 			close(socket_listen);
 			close(socket_client);
 			error("ERROR on threading client.");
 		}
 	}
-
-
-/*	while(1){
-		if((socket_client = accept(socket_listen, (struct sockaddr *) &addr, &addrlen)) < 0){
-			close(socket_listen);
-			error("ERROR on accept!");
-		}
-		printf("Client connected!\n");
-		// Will recieve something from the client
-		int byteRead = recv(socket_client, buffer, BUFFSIZE, 0);
-	    if(byteRead <= 0)
-	       error("Unable to recieve connection. Exiting...");
-
- 	   buffer[byteRead] = '\0';//adds in NULL terminator as recv does not do this.
-
-	    strcpy(website,buffer);	// Copy the buffer to use tokens
-		website = strtok(website, " ");	// Makes tokens out of the website
-			// String compare to get the GET line in website 
-		while(strcmp(website, "GET")!=0) 
-			website = strtok(NULL," \r\n");
-		website = strtok(NULL," ");	// Make another token to isolate the web address
-		if (website[0] == '/')
-			memmove(website, website + 1, strlen(website));
-	 	
-			// Removes the forward slash that is retrieved as part of the website
-		/*******************************************************************************************
-		// Checks if the file exists and goes on accordingly
-		if(!access(website, F_OK)) {
-			printf("FILE EXISTS\n");
-			// The file exists
-			ofp = fopen(website, "r");	// Opens the file
-				// Checks for file error
-			if(ofp == NULL) 
-				error("Can't open file!");
-			fseek(ofp, SEEK_SET, 0);			// Seek to the beg. of file
-			fread(buffer, BUFFSIZE + 1, 1, ofp);	// Read the file into buffer
-			fclose(ofp);
-			write(socket_client, buffer, BUFFSIZE);		// Prints out the saved file to the client
-		}
-		else{ // File doesn't exist
-			// SERVER CONNECTS TO INTERNET
-		// Creates the socket and checks if it created successfully
-			if((server = socket(AF_INET, SOCK_STREAM, 0)) <0)
-				error("ERROR on Server Socket Creation!\n");
-			printf("Server socket created!\n");
-			// Will create the server socket that will connect to the internet
-	   	 	server = socket(AF_INET, SOCK_STREAM, 0);
-	    	memset(&server_address, 0, sizeof(server_address));		// Clears up server_address so that there is nothing
-	    	// Will get the address information for the website (ie IP address)
-			if((getURL = gethostbyname(website)) == NULL)
-				error("Couldn't get an address\n");
-			printf("Got an address.\n");
-			// Copies the IP address (that is used to get the website) and stores it in the server_address's address
-			memcpy((char *) &server_address.sin_addr.s_addr, (char *) getURL->h_addr, getURL->h_length);
-			// Opens the HTTP port needed to connect to the internet
-			server_address.sin_port= htons(80);
-			server_address.sin_family = AF_INET;
-			// Connect's the server to the internet
-			if(connect(server, (struct sockaddr *) &server_address, sizeof(server_address)) != 0)
-				error("Couldn't connect\n");
-			printf("Connection made to server.\n");	
-			// Sending HTTP info
-			// Client request info (client->server)
-			strcpy(request,"GET / HTTP/1.1");
-			strcat(request,"\r\nHost: ");
-			strcat(request,website);
-			strcat(request,"\r\nConnection: close");
-			strcat(request,"\r\n\r\n");
-			// Server's request to the internet (server->internet)
-			write(server, request, strlen(request));
-			// Server recieving request (internet->server)
-			read(server, buffer, BUFFSIZE);
-			close(server);
-			printf("Response Recieved! Sending information to client...\n");	
-
-			write(socket_client,buffer,BUFFSIZE);
-			// Saves the info recieved from the internet (internet->file)
-			ofp = fopen(website, "w");
-			// Check if there is an error
-			if(ofp == NULL)	
-				error("Can't open file for cache!");	
-			// Prints to the file
-			fprintf(ofp, "%s\n", buffer);
-			// Writes to client (server->client)
-		}
-	}
-	close(socket_listen);
-    close(socket_client);//closes connection to the host
-    free(buffer);
-    free(request);
-	return 0;*/
 }
