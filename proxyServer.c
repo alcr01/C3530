@@ -62,8 +62,11 @@ void* handle_client(void* socket_desc){
 			strncpy(path,URL+i+1,strlen(URL)-i);
 			break;
 		}
+		else if(i==strlen(URL)-1){
+			strncpy(host,URL,strlen(URL));
+			break;
+		}
 	}
-	printf("\n%s %s\n",host,path);
 	response[0]='\0';
 	buffer[0]='\0';
 	if(blacklist_check(URL)==-1){
@@ -96,7 +99,8 @@ void* handle_client(void* socket_desc){
 		memset(&server_address, 0, sizeof(server_address));		// Clears up server_address so that there is nothing
 		server_address.sin_port= htons(80);
 		server_address.sin_family = AF_INET;
-		if((server_URL = gethostbyname(host)) == NULL){
+		server_URL = gethostbyname(host);
+		if(server_URL == NULL){
 			close(socket_client);
 			error("Couldn't get an address");
 		}
@@ -143,12 +147,12 @@ void* handle_client(void* socket_desc){
     		}
     	}while(size_of_response>0);
     	printf("Server response recieved!\n");
-    	pthread_mutex_lock(&mutex_lock);
     	FILE* ofp;
     	for(i=0;i<strlen(URL)+1;i++){
     		if(URL[i]=='/')
     			URL[i]='_';
     	}
+    	pthread_mutex_lock(&mutex_lock);
     	ofp = fopen(URL, "w");	// Opens the file
 		// Checks for file error
 		if(ofp == NULL) {
@@ -158,13 +162,13 @@ void* handle_client(void* socket_desc){
 		}
 		fprintf(ofp, "%s\n", buffer);
 		fclose(ofp);
+		pthread_mutex_unlock(&mutex_lock);
     	if(write(socket_client,response,strlen(response))<0){
     		close(socket_client);
     		close(socket_server);
     		error("ERROR on sending response to client");
     	}
     	printf("Response sent to client!\n");
-    	pthread_mutex_unlock(&mutex_lock);
     	close(socket_server);
     }
     close(socket_client);
