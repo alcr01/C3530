@@ -146,8 +146,6 @@ void* handle_client(void* socket_desc){
     			strcat(response,buffer);
     		}
     	}while(size_of_response>0);
-    	char* lowercase_response=malloc(sizeof(buffer));
-    	strcpy(lowercase_response,buffer);
     	printf("Server response recieved!\n");
     	FILE* ofp;
     	for(i=0;i<strlen(URL)+1;i++){
