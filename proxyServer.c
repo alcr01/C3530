@@ -64,8 +64,12 @@ void* handle_client(void* socket_desc){
 			strncpy(path,URL+i+1,strlen(URL)-i);
 			break;
 		}
+		else if(i+1==strlen(URL)){
+			strcpy(host,URL);
+			break;
+		}
 	}
-	printf("\n%s %s\n",host,path);
+	
 	response[0]='\0';
 	buffer[0]='\0';
 
@@ -97,40 +101,6 @@ void* handle_client(void* socket_desc){
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 /**********************************************************************************************/
-		censor = fopen("censor.txt", "r");					// Read the censor file
-		char *tempBuff = malloc(strlen(buffer) + 1);		// Allocate space (so that buffer doesnt mess up)
-		char **res = NULL;
-		int spaces = 0, i;
-
-		fseek(censor, 0, SEEK_END);
-		long fSize = ftell(censor);
-		fseek(censor, 0, SEEK_SET);
-
-		tempBuff = strtok(buffer, " ");
-		char *block = malloc(fSize + 1);
-
-		while(tempBuff) {
-			res = realloc(res, sizeof(char*) * ++spaces);
-			// Error allocating memory
-			if(res == NULL) { error("Memory Allocation Failed"); }
-			res[spaces - 1] = tempBuff;
-			tempBuff = strtok(NULL, " ");
-		}
-		res = realloc(res, sizeof(char*) * (spaces + 1));
-		res[spaces] = 0;
-
-		while(!feof(censor)) {
-			while(fread(block, fSize, 1, censor)) {
-				for(i = 0; i < spaces; i++) {
-					if(strcasecmp(res[i], block) == 0) {
-						printf("FOUND A BAD WORD\n \t %s \n", block);
-					}
-				}
-			}
-		}
-
-		/* free the memory allocated */
-		free (res);
 /**********************************************************************************************/
 		fclose(ofp);								// Closes the file
 		write(socket_client, buffer, BUFFSIZE);		// Prints out the saved file to the client
